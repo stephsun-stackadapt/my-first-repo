@@ -1,3 +1,5 @@
+--understanding users vs native ads
+
 select * from ASBWZPT_STACKADAPT_REPORTING_STATS_REPORTING_SNOWFLAKE_SECURE_SHARE_1690485758008.REPORTS.USERS 
 where "sf_account_id" = '0011Q00002EmRV2';
 
@@ -8,4 +10,8 @@ where "user_id" in (
 14507,
 14508,
 14504
-)
+);
+
+
+select * from DM.BI.SECURE_SF_REVOPS_ACCOUNTS
+limit 100;
