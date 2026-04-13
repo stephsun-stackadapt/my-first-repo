@@ -1,0 +1,103 @@
+create or replace view ACCOUNT_CAS_V(
+	SF_ACCOUNT_ID,
+	CAS_CG,
+	CAS_CAMPAIGN,
+	TOTAL_COMMITTED_SPEND,
+	ACCOUNT_NAME,
+	CSM_SUPPORT_TYPE,
+	VP_NAME,
+	AE_NAME,
+	AE_ID
+) as
+
+
+--BASE QUERY, CAS AT ACCOUNT LEVEL
+WITH CAS_END_DATE AS (
+    SELECT LAST_DAY(DATEADD(QUARTER, 0, CURRENT_DATE), 'QUARTER') AS CAS_END_DATE
+),
+sales_team AS (
+      SELECT DISTINCT
+        ACCOUNT_OWNER_ID__C as AE_ID,
+        AE_NAME,
+        VP_SALES_NAME as VP_NAME
+    FROM DM.BI.SECURE_SF_REVOPS_ACCOUNTS
+),
+CAS_CG AS (
+    SELECT
+        CG.SF_ACCOUNT_ID,
+        SUM(
+            CASE
+                WHEN CG.CG_FLIGHT_NO_OF_DAYS = 0
+                     OR CG.CG_FLIGHT_NO_OF_DAYS IS NULL
+                     OR CG.CG_START_DATE > CAS_END_DATE
+                     OR CG.CG_END_DATE <= CURRENT_DATE
+                THEN 0
+                ELSE
+                    CASE
+                        WHEN CG.CG_END_DATE <= CAS_END_DATE THEN
+                            GREATEST(0, CG.CG_FLIGHT_BUDGET_USD - COALESCE(CG.CG_COST_USD, 0))
+                        ELSE
+                            GREATEST(0, (CG.CG_FLIGHT_BUDGET_USD - COALESCE(CG.CG_COST_USD, 0)) *
+                                LEAST(DATEDIFF('DAY', CURRENT_DATE, CG.CG_END_DATE), DATEDIFF('DAY', CURRENT_DATE, CAS_END_DATE)) /
+                                DATEDIFF('DAY', CG.CG_START_DATE, CG.CG_END_DATE))
+                    END
+            END
+        ) AS CAS_CG
+    FROM DATA_LAB.REVOPS.CAS_VIEW_CG CG
+    CROSS JOIN CAS_END_DATE CE
+    GROUP BY CG.SF_ACCOUNT_ID
+),
+CAS_CAMPAIGN AS (
+    SELECT
+        CAMP.SF_ACCOUNT_ID,
+        SUM(
+            CASE
+                WHEN CAMP.CAMPAIGN_FLIGHT_NO_OF_DAYS = 0
+                     OR CAMP.CAMPAIGN_FLIGHT_NO_OF_DAYS IS NULL
+                     OR CAMP.START_DATE > CAS_END_DATE
+                     OR CAMP.END_DATE <= CURRENT_DATE
+                THEN 0
+                ELSE
+                    CASE
+                        WHEN CAMP.END_DATE <= CAS_END_DATE THEN
+                            GREATEST(0, CAMP.CAMPAIGN_FLIGHT_BUDGET_USD - COALESCE(CAMP.CURRENT_FLIGHT_CAMPAIGN_COST_USD, 0))
+                        ELSE
+                            GREATEST(0, (CAMP.CAMPAIGN_FLIGHT_BUDGET_USD - COALESCE(CAMP.CURRENT_FLIGHT_CAMPAIGN_COST_USD, 0)) *
+                                LEAST(DATEDIFF('DAY', CURRENT_DATE, CAMP.END_DATE), DATEDIFF('DAY', CURRENT_DATE, CAS_END_DATE)) /
+                                DATEDIFF('DAY', CAMP.START_DATE, CAMP.END_DATE))
+                    END
+            END
+        ) AS CAS_CAMPAIGN
+    FROM DATA_LAB.REVOPS.CAS_VIEW_CAMPAIGN CAMP
+    CROSS JOIN CAS_END_DATE CE
+    GROUP BY CAMP.SF_ACCOUNT_ID
+),
+CAS AS (
+    SELECT
+        COALESCE(CG.SF_ACCOUNT_ID, CAMP.SF_ACCOUNT_ID) AS SF_ACCOUNT_ID,
+        COALESCE(CAS_CG, 0) AS CAS_CG,
+        COALESCE(CAS_CAMPAIGN, 0) AS CAS_CAMPAIGN,
+        COALESCE(CAS_CG, 0) + COALESCE(CAS_CAMPAIGN, 0) AS TOTAL_COMMITTED_SPEND
+    FROM CAS_CG CG
+    FULL OUTER JOIN CAS_CAMPAIGN CAMP
+        ON CG.SF_ACCOUNT_ID = CAMP.SF_ACCOUNT_ID
+)
+SELECT
+  CG.SF_ACCOUNT_ID,
+    CG.CAS_CG,
+    CG.CAS_CAMPAIGN,
+    CG.TOTAL_COMMITTED_SPEND,
+    A.name AS account_name,
+    A.csm_support_type__c AS csm_support_type,
+    H.vp_name,
+    H.ae_name,
+    H.ae_id
+    
+    
+    
+FROM CAS CG
+LEFT JOIN DM.BI.SECURE_SF_REVOPS_ACCOUNTS A
+    ON CG.SF_ACCOUNT_ID = A.ID
+LEFT JOIN SALES_TEAM H
+    ON A.OWNERID = H.AE_ID
+ORDER BY SF_ACCOUNT_ID;
