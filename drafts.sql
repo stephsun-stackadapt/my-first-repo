@@ -79,3 +79,43 @@ SELECT DISTINCT * FROM DM.BI.D_USER_ACCOUNT_V LIMIT 100;
 
 
 SELECT DISTINCT CREDIT_ANALYST FROM DM.BI.D_USER_ACCOUNT_V ORDER BY CREDIT_ANALYST ASC;
+
+select c.id, c.externalid, c.entityid, c.custentity_cg_approved_payment_terms, t.name from inb.netsuite.customer c
+join inb.netsuite.term t on c.custentity_cg_approved_payment_terms = t.id;
+
+SELECT
+    c.CHILD_COMPANYNAME,
+    c.CHILD_ERP_ID,
+    b."approved_payment_terms"
+FROM ASBWZPT_STACKADAPT_REPORTING_STATS_REPORTING_SNOWFLAKE_SECURE_SHARE_1690485758008.REPORTS.BILLING_DATA b
+JOIN DM.BI.CHILD_TO_PARENT_ERP_ID c
+    ON b."netsuite_display_id" = c.CHILD_ERP_ID
+WHERE "approved_payment_terms" ILIKE '%net%';
+
+
+select "id", "requested_payment_terms", "approved_payment_terms" 
+from asbwzpt_stackadapt_reporting_stats_reporting_snowflake_secure_share_1690485758008.reports.billing_data limit 100;
+
+
+select metric_date,sf_account_id,account_id,sum(metric_value)from DATA_LAB.REVOPS.CAS_DAILY_OBT where
+
+metric_name='cas_margin_usd'--sf_account_id='0011Q00002IEVtWQAX'  and  metric_name='cas_margin_usd'
+
+group by 1,2,3;
+
+SELECT * FROM DATA_LAB.REVOPS.CAS_DAILY_OBT WHERE METRIC_DATE >= CURRENT_DATE
+ORDER BY METRIC_DATE ASC LIMIT 100;
+
+SELECT DISTINCT METRIC_NAME FROM DATA_LAB.REVOPS.CAS_DAILY_OBT;
+
+select * from account_cas_v_new limit 100;
+
+
+select 
+    DATE_TRUNC('QUARTER', METRIC_DATE)::DATE AS QUARTER,
+    sf_account_id,
+    account_id,
+    sum(metric_value)
+from DATA_LAB.REVOPS.CAS_DAILY_OBT 
+where metric_name='cas_margin_usd' and METRIC_DATE >= CURRENT_DATE
+group by 1,2,3;
